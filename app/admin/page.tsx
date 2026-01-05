@@ -524,7 +524,7 @@ export default function AdminPage() {
                         variant="outline"
                         onClick={() => {
                           setEditingProduct(null)
-                          setFormData({ name: '', company: '', rawDetails: '', tags: [] })
+                          setFormData({ name: '', company: '', rawDetails: '', insuranceType: '종합보험', tags: [] })
                           setTagInput('')
                           setUploadedFileName(null)
                           setUploadedFile(null)
