@@ -2,14 +2,22 @@ import OpenAI from 'openai'
 
 const apiKey = process.env.OPENAI_API_KEY
 
-if (!apiKey) {
-  console.error('OPENAI_API_KEY가 설정되지 않았습니다.')
-  throw new Error('Missing OPENAI_API_KEY environment variable')
+// Lazy initialization - 빌드 시점에 에러 발생 방지
+let _openai: OpenAI | null = null
+
+export const getOpenAI = (): OpenAI => {
+  if (!_openai) {
+    if (!apiKey) {
+      console.error('OPENAI_API_KEY가 설정되지 않았습니다.')
+      throw new Error('Missing OPENAI_API_KEY environment variable')
+    }
+    _openai = new OpenAI({ apiKey })
+  }
+  return _openai
 }
 
-export const openai = new OpenAI({
-  apiKey: apiKey,
-})
+// 하위 호환성을 위한 export
+export const openai = apiKey ? new OpenAI({ apiKey }) : null as unknown as OpenAI
 
 export async function generateProductSummary(rawDetails: string): Promise<any> {
   try {

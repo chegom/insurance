@@ -2,12 +2,22 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 
 const apiKey = process.env.GEMINI_API_KEY
 
-if (!apiKey) {
-  console.error('GEMINI_API_KEY가 설정되지 않았습니다.')
-  throw new Error('Missing GEMINI_API_KEY environment variable')
+// Lazy initialization - 빌드 시점에 에러 발생 방지
+let _genAI: GoogleGenerativeAI | null = null
+
+export const getGenAI = (): GoogleGenerativeAI => {
+  if (!_genAI) {
+    if (!apiKey) {
+      console.error('GEMINI_API_KEY가 설정되지 않았습니다.')
+      throw new Error('Missing GEMINI_API_KEY environment variable')
+    }
+    _genAI = new GoogleGenerativeAI(apiKey)
+  }
+  return _genAI
 }
 
-export const genAI = new GoogleGenerativeAI(apiKey)
+// 하위 호환성을 위한 export
+export const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null as unknown as GoogleGenerativeAI
 
 export async function generateProductSummary(rawDetails: string): Promise<any> {
   try {
