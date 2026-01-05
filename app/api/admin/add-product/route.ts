@@ -154,7 +154,7 @@ export async function POST(request: NextRequest) {
 
     // 입력 데이터 검증 (파일이 있으면 검증 완화)
     // 파일이 업로드된 경우 details가 비어있어도 허용 (PDF에서 추출할 예정)
-    const hasFile = file && file.type === 'application/pdf'
+    const hasFile = !!(file && file.type === 'application/pdf')
     const validation = validateProductInput(name, company, details, hasFile)
     if (!validation.isValid) {
       return NextResponse.json(
