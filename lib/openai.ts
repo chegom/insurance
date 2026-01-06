@@ -203,19 +203,99 @@ ${truncatedDetails}`
 
 // 텍스트를 토큰 제한에 맞게 자르기 (대략 3자 = 1토큰, 한글 기준)
 function truncateText(text: string, maxTokens: number = 30000): string {
-  // 한글은 토큰당 약 1.5~2자, 영어는 약 4자
-  // 안전하게 3자 = 1토큰으로 계산
   const maxChars = maxTokens * 3
   if (text.length <= maxChars) {
     return text
   }
   console.log(`텍스트가 너무 깁니다. ${text.length}자 -> ${maxChars}자로 자릅니다.`)
   
-  // 앞부분과 뒷부분을 각각 가져와서 중요한 정보 보존
-  const frontPart = text.substring(0, maxChars * 0.7) // 앞 70%
-  const backPart = text.substring(text.length - maxChars * 0.2) // 뒤 20%
+  const frontPart = text.substring(0, maxChars * 0.7)
+  const backPart = text.substring(text.length - maxChars * 0.2)
   
   return frontPart + '\n\n... (중간 내용 생략) ...\n\n' + backPart
+}
+
+// 텍스트를 청크로 분할
+function splitIntoChunks(text: string, chunkSize: number = 80000): string[] {
+  const chunks: string[] = []
+  for (let i = 0; i < text.length; i += chunkSize) {
+    chunks.push(text.substring(i, i + chunkSize))
+  }
+  return chunks
+}
+
+// PDF에서 중요 정보만 추출 (청크 단위로 처리)
+export async function extractKeyInfoFromPDF(rawText: string): Promise<string> {
+  try {
+    const chunks = splitIntoChunks(rawText, 80000) // 약 25K 토큰씩
+    console.log(`PDF 텍스트를 ${chunks.length}개 청크로 분할하여 처리합니다.`)
+    
+    const extractedParts: string[] = []
+    
+    for (let i = 0; i < chunks.length; i++) {
+      console.log(`청크 ${i + 1}/${chunks.length} 처리 중...`)
+      
+      const prompt = `당신은 보험 약관 분석 전문가입니다. 다음 보험 약관 텍스트에서 중요한 정보만 추출해주세요.
+
+**추출할 정보 (있는 것만 추출):**
+1. 상품명, 보험사명
+2. 보장 내용 (사망, 질병, 상해, 입원, 수술 등 - 구체적인 금액 포함)
+3. 보험료 정보
+4. 가입 조건 (나이, 건강상태 등)
+5. 면책/감액 기간
+6. 갱신 조건
+7. 특약 정보
+8. 기타 중요한 조건이나 제한사항
+
+**중요**: 
+- 구체적인 숫자, 금액, 기간은 반드시 포함하세요
+- 원본의 정확한 표현을 유지하세요
+- 불필요한 서식이나 반복되는 내용은 제외하세요
+- 핵심 정보만 간결하게 정리하세요
+
+텍스트 (${i + 1}/${chunks.length} 부분):
+${chunks[i]}`
+
+      try {
+        const completion = await getOpenAI().chat.completions.create({
+          model: 'gpt-4o-mini',
+          messages: [
+            {
+              role: 'system',
+              content: '보험 약관에서 핵심 정보만 추출하는 전문가입니다. 구체적인 수치와 조건을 정확하게 추출합니다.',
+            },
+            {
+              role: 'user',
+              content: prompt,
+            },
+          ],
+          temperature: 0.2,
+          max_tokens: 4000,
+        })
+
+        const extracted = completion.choices[0]?.message?.content || ''
+        if (extracted.trim()) {
+          extractedParts.push(`=== 파트 ${i + 1} ===\n${extracted}`)
+        }
+      } catch (chunkError) {
+        console.error(`청크 ${i + 1} 처리 오류:`, chunkError)
+        // 한 청크가 실패해도 계속 진행
+      }
+    }
+    
+    if (extractedParts.length === 0) {
+      throw new Error('PDF에서 정보를 추출할 수 없습니다.')
+    }
+    
+    // 모든 추출된 정보 합치기
+    const combinedInfo = extractedParts.join('\n\n')
+    console.log(`총 ${extractedParts.length}개 파트에서 정보 추출 완료. 총 ${combinedInfo.length}자`)
+    
+    return combinedInfo
+  } catch (error) {
+    console.error('PDF 정보 추출 오류:', error)
+    throw error
+  }
 }
 
 // 상세 정보를 구조화된 레이아웃으로 정리

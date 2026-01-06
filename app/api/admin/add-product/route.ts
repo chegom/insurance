@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabase, getSupabaseAdmin } from '@/lib/supabase'
-import { generateProductSummary } from '@/lib/openai'
+import { generateProductSummary, extractKeyInfoFromPDF } from '@/lib/openai'
 import { validateProductInput } from '@/lib/validation'
 import { downloadFileFromStorage } from '@/lib/storage'
 
 // Node.js 런타임에서만 pdf-parse 사용
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-export const maxDuration = 60
+export const maxDuration = 300 // 대용량 PDF 처리를 위해 5분으로 증가
 
 // PostgreSQL이 처리할 수 없는 문자 제거
 function sanitizeText(text: string): string {
@@ -120,6 +120,19 @@ export async function POST(request: NextRequest) {
         try {
           extractedText = await parsePdf(buffer)
           console.log('PDF 파싱 성공, 추출된 텍스트 길이:', extractedText.length)
+          
+          // 텍스트가 너무 길면 (약 100K자 이상) AI로 핵심 정보만 추출
+          if (extractedText.length > 100000) {
+            console.log('텍스트가 너무 깁니다. AI로 핵심 정보를 추출합니다...')
+            try {
+              extractedText = await extractKeyInfoFromPDF(extractedText)
+              console.log('AI 추출 완료, 결과 길이:', extractedText.length)
+            } catch (extractError) {
+              console.error('AI 추출 오류:', extractError)
+              // AI 추출 실패 시 앞부분만 사용
+              extractedText = extractedText.substring(0, 100000) + '\n\n... (내용이 너무 길어 일부만 저장됨)'
+            }
+          }
         } catch (parseError) {
           console.error('PDF 파싱 오류:', parseError)
           // 파싱 실패해도 계속 진행
