@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabase } from '@/lib/supabase'
 
+// 정적 렌더링 방지
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     // 환경변수 확인

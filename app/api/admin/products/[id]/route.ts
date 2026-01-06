@@ -3,6 +3,9 @@ import { getSupabase } from '@/lib/supabase'
 import { generateProductSummary } from '@/lib/openai'
 import { validateProductInput } from '@/lib/validation'
 
+// 정적 렌더링 방지
+export const dynamic = 'force-dynamic'
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

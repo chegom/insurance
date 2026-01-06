@@ -3,6 +3,9 @@ import { getSupabase } from '@/lib/supabase'
 import { analyzeComparison } from '@/lib/openai'
 import { validateCustomerInsurance } from '@/lib/validation'
 
+// 정적 렌더링 방지
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()

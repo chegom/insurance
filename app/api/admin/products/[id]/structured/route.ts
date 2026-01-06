@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSupabase } from '@/lib/supabase'
 import { generateStructuredDetails, generateProductSummary } from '@/lib/openai'
 
+// 정적 렌더링 방지
+export const dynamic = 'force-dynamic'
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
