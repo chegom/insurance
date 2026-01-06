@@ -6,50 +6,20 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60 // 큰 파일 처리 시간을 위해 60초로 설정
 
-// pdf-parse를 사용하여 PDF 파싱
-async function parsePdf(uint8Array: Uint8Array): Promise<string> {
+// pdf-parse를 사용하여 PDF 파싱 (서버리스 환경 호환)
+async function parsePdf(buffer: Buffer): Promise<string> {
   try {
-    // Node.js 런타임에서는 require를 직접 사용
+    // pdf-parse 1.x 스타일 API 사용 (서버리스 환경에서 더 안정적)
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const pdfParseModule = require('pdf-parse')
+    const pdfParse = require('pdf-parse/lib/pdf-parse.js')
     
-    // pdf-parse 최신 버전은 PDFParse 클래스를 export함
-    const PDFParseClass = pdfParseModule.PDFParse
+    const data = await pdfParse(buffer)
     
-    if (!PDFParseClass || typeof PDFParseClass !== 'function') {
-      throw new Error('PDFParse 클래스를 찾을 수 없습니다.')
-    }
-    
-    // PDFParse 인스턴스 생성 (Uint8Array 사용)
-    const parser = new PDFParseClass(uint8Array)
-    
-    // PDF 로드 및 텍스트 추출
-    await parser.load()
-    
-    // 모든 페이지의 텍스트 추출
-    let fullText = ''
-    const numPages = parser.getInfo()?.pages || 1
-    
-    for (let pageNum = 1; pageNum <= numPages; pageNum++) {
-      const pageText = parser.getPageText(pageNum)
-      if (pageText) {
-        fullText += pageText + '\n'
-      }
-    }
-    
-    // getText()가 전체 텍스트를 반환하는 경우
-    if (!fullText.trim()) {
-      const allText = parser.getText()
-      if (allText) {
-        fullText = allText
-      }
-    }
-    
-    if (!fullText || !fullText.trim()) {
+    if (!data.text || !data.text.trim()) {
       throw new Error('PDF에서 텍스트를 추출할 수 없습니다.')
     }
     
-    return fullText.trim()
+    return data.text.trim()
   } catch (error) {
     console.error('PDF 파싱 오류:', error)
     throw error
@@ -91,10 +61,10 @@ export async function POST(request: NextRequest) {
     // PDF 파일 처리
     if (fileType === 'application/pdf') {
       const arrayBuffer = await file.arrayBuffer()
-      const uint8Array = new Uint8Array(arrayBuffer)
+      const buffer = Buffer.from(arrayBuffer)
       
       try {
-        const extractedText = await parsePdf(uint8Array)
+        const extractedText = await parsePdf(buffer)
 
         if (!extractedText || extractedText.trim().length === 0) {
           return NextResponse.json(
