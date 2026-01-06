@@ -6,12 +6,12 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60 // 큰 파일 처리 시간을 위해 60초로 설정
 
-// pdf-parse를 사용하여 PDF 파싱 (서버리스 환경 호환)
+// pdf-parse를 사용하여 PDF 파싱 (서버리스 환경 호환 - v1.1.1)
 async function parsePdf(buffer: Buffer): Promise<string> {
   try {
-    // pdf-parse 1.x 스타일 API 사용 (서버리스 환경에서 더 안정적)
+    // pdf-parse 1.x API 사용
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const pdfParse = require('pdf-parse/lib/pdf-parse.js')
+    const pdfParse = require('pdf-parse')
     
     const data = await pdfParse(buffer)
     
