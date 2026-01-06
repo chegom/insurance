@@ -4,15 +4,23 @@ import { generateStructuredDetails, generateProductSummary } from '@/lib/openai'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params
+    // Next.js 14에서 params는 Promise
+    const { id } = await params
 
     // 환경변수 확인
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
       return NextResponse.json(
         { error: 'Supabase 환경변수가 설정되지 않았습니다.' },
+        { status: 500 }
+      )
+    }
+
+    if (!process.env.OPENAI_API_KEY) {
+      return NextResponse.json(
+        { error: 'OpenAI API 키가 설정되지 않았습니다.' },
         { status: 500 }
       )
     }
