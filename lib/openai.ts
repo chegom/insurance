@@ -33,6 +33,9 @@ export async function generateProductSummary(rawDetails: string): Promise<any> {
       throw new Error('숫자만으로는 분석할 수 없습니다. 실제 보험 상품의 상세 정보를 입력해주세요.')
     }
 
+    // 토큰 제한 초과 방지
+    const truncatedDetails = truncateText(rawDetails)
+
     const prompt = `당신은 보험 상품 분석 전문가입니다. 다음 보험 상품의 상세 내용을 분석하여 구조화된 JSON 형식으로 요약해주세요.
 
 **중요**: 
@@ -93,7 +96,7 @@ export async function generateProductSummary(rawDetails: string): Promise<any> {
 **반드시 유효한 JSON 형식으로만 응답하세요. 다른 설명이나 주석은 포함하지 마세요.**
 
 보험 상품 상세 내용:
-${rawDetails}`
+${truncatedDetails}`
 
     console.log('Calling OpenAI API...')
     const completion = await getOpenAI().chat.completions.create({
@@ -198,9 +201,22 @@ ${rawDetails}`
   }
 }
 
+// 텍스트를 토큰 제한에 맞게 자르기 (대략 4자 = 1토큰)
+function truncateText(text: string, maxTokens: number = 100000): string {
+  const maxChars = maxTokens * 4 // 대략적인 토큰-문자 변환
+  if (text.length <= maxChars) {
+    return text
+  }
+  console.log(`텍스트가 너무 깁니다. ${text.length}자 -> ${maxChars}자로 자릅니다.`)
+  return text.substring(0, maxChars) + '\n\n... (내용이 너무 길어 일부만 분석합니다)'
+}
+
 // 상세 정보를 구조화된 레이아웃으로 정리
 export async function generateStructuredDetails(rawDetails: string): Promise<string> {
   try {
+    // 토큰 제한 초과 방지
+    const truncatedDetails = truncateText(rawDetails)
+    
     const prompt = `당신은 보험 상품 문서 작성 전문가입니다. 다음 보험 상품의 상세 내용을 분석하여 마크다운 형식으로 구조화된 레이아웃으로 정리해주세요.
 
 다음 섹션들을 포함하여 정리해주세요:
@@ -215,7 +231,7 @@ export async function generateStructuredDetails(rawDetails: string): Promise<str
 원본 내용을 바꾸지 말고, 정보를 체계적으로 정리하고 구조화해주세요. 표를 사용하여 정보를 명확하게 표현하세요.
 
 보험 상품 상세 내용:
-${rawDetails}`
+${truncatedDetails}`
 
     const completion = await getOpenAI().chat.completions.create({
       model: 'gpt-4o-mini',
