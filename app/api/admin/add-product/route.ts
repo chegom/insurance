@@ -9,42 +9,37 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
-// pdf-parse를 사용하여 PDF 파싱
-async function parsePdf(uint8Array: Uint8Array): Promise<string> {
+// PostgreSQL이 처리할 수 없는 문자 제거
+function sanitizeText(text: string): string {
+  if (!text) return ''
+  
+  return text
+    // null 바이트 제거
+    .replace(/\x00/g, '')
+    // 잘못된 유니코드 이스케이프 시퀀스 제거
+    .replace(/\\u[0-9a-fA-F]{0,3}(?![0-9a-fA-F])/g, '')
+    // 제어 문자 제거 (탭, 줄바꿈, 캐리지 리턴 제외)
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+    // 잘못된 서로게이트 쌍 제거
+    .replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g, '')
+    .replace(/(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '')
+    // 백슬래시 이스케이프 처리
+    .replace(/\\/g, '\\\\')
+}
+
+// pdf-parse를 사용하여 PDF 파싱 (v1.1.1)
+async function parsePdf(buffer: Buffer): Promise<string> {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const pdfParseModule = require('pdf-parse')
-    const PDFParseClass = pdfParseModule.PDFParse
+    const pdfParse = require('pdf-parse')
     
-    if (!PDFParseClass || typeof PDFParseClass !== 'function') {
-      throw new Error('PDFParse 클래스를 찾을 수 없습니다.')
-    }
+    const data = await pdfParse(buffer)
     
-    const parser = new PDFParseClass(uint8Array)
-    await parser.load()
-    
-    let fullText = ''
-    const numPages = parser.getInfo()?.pages || 1
-    
-    for (let pageNum = 1; pageNum <= numPages; pageNum++) {
-      const pageText = parser.getPageText(pageNum)
-      if (pageText) {
-        fullText += pageText + '\n'
-      }
-    }
-    
-    if (!fullText.trim()) {
-      const allText = parser.getText()
-      if (allText) {
-        fullText = allText
-      }
-    }
-    
-    if (!fullText || !fullText.trim()) {
+    if (!data.text || !data.text.trim()) {
       throw new Error('PDF에서 텍스트를 추출할 수 없습니다.')
     }
     
-    return fullText.trim()
+    return sanitizeText(data.text.trim())
   } catch (error) {
     console.error('PDF 파싱 오류:', error)
     throw error
@@ -96,7 +91,7 @@ export async function POST(request: NextRequest) {
     if (file && file.type === 'application/pdf') {
       try {
         const arrayBuffer = await file.arrayBuffer()
-        const uint8Array = new Uint8Array(arrayBuffer)
+        const buffer = Buffer.from(arrayBuffer)
         
         // 파일을 Supabase Storage에 저장
         const fileName = `products/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
@@ -123,7 +118,7 @@ export async function POST(request: NextRequest) {
         // PDF 파싱하여 텍스트 추출
         let extractedText = ''
         try {
-          extractedText = await parsePdf(uint8Array)
+          extractedText = await parsePdf(buffer)
           console.log('PDF 파싱 성공, 추출된 텍스트 길이:', extractedText.length)
         } catch (parseError) {
           console.error('PDF 파싱 오류:', parseError)
@@ -256,14 +251,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Supabase에 저장
+    // Supabase에 저장 (텍스트 정제 적용)
     const { data, error } = await supabase
       .from('products')
       .insert([
         {
-          name,
-          company,
-          raw_details: details,
+          name: sanitizeText(name),
+          company: sanitizeText(company),
+          raw_details: sanitizeText(details),
           summary_json: summaryJson,
           insurance_type: insuranceType || '종합보험',
           tags: tags || [],
