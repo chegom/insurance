@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { getSupabase } from '@/lib/supabase'
 import { analyzeComparison } from '@/lib/openai'
 import { validateCustomerInsurance } from '@/lib/validation'
 
@@ -33,6 +33,7 @@ export async function POST(request: NextRequest) {
                   customerInfo.lifestyle?.toLowerCase().includes('자동차 없음')
 
     // 고객의 현재 보험 종류와 상황에 맞는 상품만 필터링
+    const supabase = getSupabase()
     let query = supabase
       .from('products')
       .select('*')

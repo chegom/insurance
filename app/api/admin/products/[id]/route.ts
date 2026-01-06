@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { getSupabase } from '@/lib/supabase'
 import { generateProductSummary } from '@/lib/openai'
 import { validateProductInput } from '@/lib/validation'
 
@@ -10,6 +10,7 @@ export async function GET(
   try {
     const { id } = params
 
+    const supabase = getSupabase()
     const { data: product, error } = await supabase
       .from('products')
       .select('*')
@@ -75,6 +76,7 @@ export async function PUT(
     }
 
     // 상품 업데이트
+    const supabase = getSupabase()
     const { data, error } = await supabase
       .from('products')
       .update({
@@ -117,6 +119,7 @@ export async function DELETE(
   try {
     const { id } = params
 
+    const supabase = getSupabase()
     const { error } = await supabase
       .from('products')
       .delete()

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase, supabaseAdmin } from '@/lib/supabase'
+import { getSupabase, getSupabaseAdmin } from '@/lib/supabase'
 import { generateProductSummary } from '@/lib/openai'
 import { validateProductInput } from '@/lib/validation'
 import { downloadFileFromStorage } from '@/lib/storage'
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
         
         // 파일을 Supabase Storage에 저장
         const fileName = `products/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
-        const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
+        const { data: uploadData, error: uploadError } = await getSupabaseAdmin().storage
           .from('insurance-files')
           .upload(fileName, arrayBuffer, {
             contentType: 'application/pdf',
@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
           // 파일 업로드 실패해도 계속 진행
         } else {
           // Public URL 생성
-          const { data: urlData } = supabaseAdmin.storage
+          const { data: urlData } = getSupabaseAdmin().storage
             .from('insurance-files')
             .getPublicUrl(fileName)
           
@@ -252,7 +252,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Supabase에 저장 (텍스트 정제 적용)
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('products')
       .insert([
         {

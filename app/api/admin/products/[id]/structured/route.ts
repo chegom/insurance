@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { getSupabase } from '@/lib/supabase'
 import { generateStructuredDetails, generateProductSummary } from '@/lib/openai'
 
 export async function POST(
@@ -8,6 +8,16 @@ export async function POST(
 ) {
   try {
     const { id } = params
+
+    // 환경변수 확인
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      return NextResponse.json(
+        { error: 'Supabase 환경변수가 설정되지 않았습니다.' },
+        { status: 500 }
+      )
+    }
+
+    const supabase = getSupabase()
 
     // 상품 정보 가져오기
     const { data: product, error } = await supabase
@@ -32,7 +42,7 @@ export async function POST(
       updatedSummary = await generateProductSummary(product.raw_details)
       
       // DB에 업데이트된 요약 정보 저장
-      await supabase
+      await getSupabase()
         .from('products')
         .update({ summary_json: updatedSummary })
         .eq('id', id)
