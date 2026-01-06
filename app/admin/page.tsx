@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { createClient } from '@supabase/supabase-js'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -25,6 +26,11 @@ import {
 } from '@/components/ui/select'
 import { Shield, Loader2, Building2, Calendar, Eye, Search, Edit, Trash2, X, Tag, Upload, FileText } from 'lucide-react'
 import { Product } from '@/types/database'
+
+// Supabase 클라이언트 (클라이언트 사이드용)
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null
 
 const INSURANCE_TYPES = ['종합보험', '자동차보험', '자녀보험', '화재보험'] as const
 
@@ -105,39 +111,66 @@ export default function AdminPage() {
       return
     }
 
+    // Supabase 클라이언트 확인
+    if (!supabase) {
+      setMessage({ type: 'error', text: 'Supabase 연결이 설정되지 않았습니다.' })
+      return
+    }
+
     setIsUploadingFile(true)
     setMessage(null)
     setUploadedFileName(null)
 
     try {
-      const formDataToSend = new FormData()
-      formDataToSend.append('file', file)
+      // 1. Supabase Storage에 직접 업로드 (서버리스 함수 우회)
+      const fileName = `products/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
+      
+      setMessage({ type: 'success', text: '파일을 Storage에 업로드 중...' })
+      
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('insurance-files')
+        .upload(fileName, file, {
+          contentType: 'application/pdf',
+          upsert: false,
+        })
 
-      const response = await fetch('/api/admin/upload-file', {
-        method: 'POST',
-        body: formDataToSend,
-      })
-
-      // 응답이 JSON인지 확인
-      const contentType = response.headers.get('content-type')
-      if (!contentType || !contentType.includes('application/json')) {
-        const text = await response.text()
-        console.error('Non-JSON response:', text.substring(0, 200))
-        throw new Error('서버에서 예상치 못한 응답을 받았습니다.')
+      if (uploadError) {
+        console.error('Storage 업로드 오류:', uploadError)
+        throw new Error(`파일 업로드 실패: ${uploadError.message}`)
       }
+
+      // 2. 업로드된 파일 URL 가져오기
+      const { data: urlData } = supabase.storage
+        .from('insurance-files')
+        .getPublicUrl(fileName)
+
+      const fileUrl = urlData.publicUrl
+      console.log('파일 업로드 완료:', fileUrl)
+
+      setMessage({ type: 'success', text: 'AI가 PDF에서 정보를 추출 중... (대용량 파일은 시간이 걸릴 수 있습니다)' })
+
+      // 3. 서버에서 파일 처리 요청 (파일 경로만 전송)
+      const response = await fetch('/api/admin/process-pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          filePath: fileName,
+          fileUrl: fileUrl,
+          fileName: file.name,
+        }),
+      })
 
       const data = await response.json()
 
       if (!response.ok) {
-        const errorMsg = data.error || '파일 업로드에 실패했습니다.'
-        const detailsMsg = data.details ? ` (${data.details})` : ''
-        throw new Error(`${errorMsg}${detailsMsg}`)
+        throw new Error(data.error || '파일 처리에 실패했습니다.')
       }
 
       // 추출된 텍스트를 rawDetails에 추가
       const extractedText = data.text
       if (extractedText && extractedText.trim().length > 0) {
-        // 기존 내용이 있으면 줄바꿈 추가, 없으면 그대로 설정
         const currentDetails = formData.rawDetails.trim()
         const newDetails = currentDetails 
           ? `${currentDetails}\n\n--- 업로드된 파일 내용 (${file.name}) ---\n\n${extractedText}`
@@ -145,11 +178,11 @@ export default function AdminPage() {
         
         setFormData({ ...formData, rawDetails: newDetails })
         setUploadedFileName(file.name)
-        setUploadedFile(file) // 파일 객체 저장
+        setUploadedFile(null) // 파일 객체는 저장하지 않음 (이미 Storage에 있음)
         
         setMessage({ 
           type: 'success', 
-          text: `파일이 성공적으로 업로드되었습니다. "상품 추가 및 AI 요약" 버튼을 클릭하면 파일을 분석하여 저장합니다.` 
+          text: `파일에서 핵심 정보를 추출했습니다! "상품 추가 및 AI 요약" 버튼을 클릭하세요.` 
         })
       } else {
         throw new Error('파일에서 텍스트를 추출할 수 없습니다.')
