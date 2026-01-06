@@ -96,7 +96,7 @@ export async function generateProductSummary(rawDetails: string): Promise<any> {
 ${rawDetails}`
 
     console.log('Calling OpenAI API...')
-    const completion = await openai.chat.completions.create({
+    const completion = await getOpenAI().chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
         {
@@ -217,7 +217,7 @@ export async function generateStructuredDetails(rawDetails: string): Promise<str
 보험 상품 상세 내용:
 ${rawDetails}`
 
-    const completion = await openai.chat.completions.create({
+    const completion = await getOpenAI().chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
         {
@@ -235,6 +235,9 @@ ${rawDetails}`
     return completion.choices[0]?.message?.content || '구조화된 정보를 생성할 수 없습니다.'
   } catch (error) {
     console.error('Error generating structured details:', error)
+    if (error instanceof Error) {
+      throw new Error(`구조화된 정보 생성 실패: ${error.message}`)
+    }
     throw new Error('Failed to generate structured details')
   }
 }
@@ -519,7 +522,7 @@ ${recommendedProducts[2] ? `### 추천 순위 3위: ${recommendedProducts[2].nam
 - 과장하지 말고 객관적이고 설득력 있게 작성하세요`
 
   try {
-    const completion = await openai.chat.completions.create({
+    const completion = await getOpenAI().chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
         {
@@ -537,6 +540,9 @@ ${recommendedProducts[2] ? `### 추천 순위 3위: ${recommendedProducts[2].nam
     return completion.choices[0]?.message?.content || '분석 결과를 생성할 수 없습니다.'
   } catch (error) {
     console.error('Error analyzing comparison:', error)
+    if (error instanceof Error) {
+      throw new Error(`비교 분석 실패: ${error.message}`)
+    }
     throw new Error('Failed to analyze comparison')
   }
 }
