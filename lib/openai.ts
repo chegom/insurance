@@ -201,14 +201,21 @@ ${truncatedDetails}`
   }
 }
 
-// 텍스트를 토큰 제한에 맞게 자르기 (대략 4자 = 1토큰)
-function truncateText(text: string, maxTokens: number = 100000): string {
-  const maxChars = maxTokens * 4 // 대략적인 토큰-문자 변환
+// 텍스트를 토큰 제한에 맞게 자르기 (대략 3자 = 1토큰, 한글 기준)
+function truncateText(text: string, maxTokens: number = 30000): string {
+  // 한글은 토큰당 약 1.5~2자, 영어는 약 4자
+  // 안전하게 3자 = 1토큰으로 계산
+  const maxChars = maxTokens * 3
   if (text.length <= maxChars) {
     return text
   }
   console.log(`텍스트가 너무 깁니다. ${text.length}자 -> ${maxChars}자로 자릅니다.`)
-  return text.substring(0, maxChars) + '\n\n... (내용이 너무 길어 일부만 분석합니다)'
+  
+  // 앞부분과 뒷부분을 각각 가져와서 중요한 정보 보존
+  const frontPart = text.substring(0, maxChars * 0.7) // 앞 70%
+  const backPart = text.substring(text.length - maxChars * 0.2) // 뒤 20%
+  
+  return frontPart + '\n\n... (중간 내용 생략) ...\n\n' + backPart
 }
 
 // 상세 정보를 구조화된 레이아웃으로 정리
